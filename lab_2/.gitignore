@@ -9,6 +9,7 @@ __pycache__/
 
 # Jupyter
 .ipynb_checkpoints/
+.Trash-0/
 
 # Environment / secrets
 .env
