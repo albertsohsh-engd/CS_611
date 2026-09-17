@@ -32,3 +32,4 @@ Thumbs.db
 
 # Large data files / model artifacts (too big for GitHub, kept local only)
 Data/
+datamart/
