@@ -29,3 +29,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Data files
+data/
+datamart/
