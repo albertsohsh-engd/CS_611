@@ -1,0 +1,21 @@
+Install the Cryptography Package:
+Open your terminal and run:
+
+bash
+Copy
+pip3 install cryptography
+This command uses pip for Python 3 to install the cryptography package.
+
+Generate Your Fernet Key:
+After the package is installed, generate a Fernet key by running:
+
+bash
+Copy
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+This command will print out a key that looks something like:
+
+makefile
+Copy
+w8sS3Qp6mhQjt5ePpHQvwsdVdrZdj4a7QIgBvPo4VFk=
+Use the Fernet Key in Your Configuration:
+Copy the generated key and replace YOUR_FERNET_KEY_HERE in your Docker Compose file with this key.
