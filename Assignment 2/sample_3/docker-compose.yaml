@@ -1,0 +1,10 @@
+version: '3'
+services:
+  spark:
+    container_name: mle_a1_jupyter 
+    build: .
+    ports:
+      - "8890:8888"
+    volumes:
+      - .:/home/jovyan/work
+    command: start-notebook.sh --NotebookApp.token=''
