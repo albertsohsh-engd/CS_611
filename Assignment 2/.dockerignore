@@ -1,0 +1,8 @@
+data/
+datamart/
+.ipynb_checkpoints/
+__pycache__/
+.git/
+sample_1/
+sample_2/
+sample_3/

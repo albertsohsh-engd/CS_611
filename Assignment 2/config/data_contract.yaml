@@ -1,0 +1,152 @@
+# =====================================================================================
+# Prediction / data contract — Step 01
+# Single source of truth for what the model predicts, when, for whom, and with which data.
+# Read by: script/datapipeline.ipynb (tests), util/dataprocessing_*.ipynb, script/mlpipeline.ipynb
+# =====================================================================================
+
+contract:
+  name: loan_default_30dpd_6mob
+  version: 1.1.0                 # 1.1.0: derived features added (Gold step 10); raw text columns replaced
+  status: draft                  # draft -> signed (fill signed_by / signed_date when approved)
+  owner: albertsoh
+  signed_by: null                # v1.0.0 was signed by albertsoh on 2026-10-18
+  signed_date: null
+  last_updated: 2026-10-18
+
+problem:
+  description: >
+    At loan application, predict whether the loan will be 30 or more days past due
+    at month-on-book 6 (six months after the loan starts).
+  type: binary_classification
+
+# ---- Who and at what grain -----------------------------------------------------------
+entity:
+  key: loan_id
+  customer_key: Customer_ID     # one loan per customer in this extract (checked by tests)
+
+prediction_grain: one row per loan_id, scored once at application
+
+# ---- When the prediction is made -----------------------------------------------------
+scoring_timestamp:
+  table: lms_loan_daily
+  column: loan_start_date
+  rule: every feature must be observable on or before loan_start_date
+
+# ---- What is predicted ---------------------------------------------------------------
+target:
+  name: label
+  label_def: 30dpd_6mob
+  positive_class: 1             # 1 = default (30+ DPD at MOB 6)
+  negative_class: 0
+  dpd_threshold: 30
+  mob: 6
+  table: lms_loan_daily
+  derivation:                   # same convention as the course labs
+    mob: installment_num
+    installments_missed: ceil(overdue_amt / due_amt); 0 when overdue_amt = 0
+    first_missed_date: add_months(snapshot_date, -installments_missed)
+    dpd: datediff(snapshot_date, first_missed_date) when overdue_amt > 0, else 0
+    label: 1 if dpd >= dpd_threshold on the snapshot where mob = target.mob, else 0
+  outcome_timestamp: snapshot_date where mob = target.mob (loan_start_date + 6 months)
+
+outcome_horizon_months: 6       # must equal target.mob
+
+# ---- Which loans count -----------------------------------------------------------------
+eligibility:
+  - id: one_row_per_loan
+    rule: exactly one row per loan_id in the model table
+  - id: label_mature
+    rule: loan has a snapshot with installment_num = target.mob (otherwise label unknown -> excluded)
+  - id: no_immature_labels
+    rule: loans whose MOB-6 date is after the data cut-off are excluded, never labelled 0
+
+# ---- Source tables (also drive Bronze ingestion) ---------------------------------------
+sources:
+  lms_loan_daily:
+    file: lms_loan_daily.csv
+    event_time: snapshot_date
+    keys: [loan_id, snapshot_date]
+    role: label_source
+  feature_clickstream:
+    file: feature_clickstream.csv
+    event_time: snapshot_date
+    keys: [Customer_ID, snapshot_date]
+    role: feature_source
+  features_attributes:
+    file: features_attributes.csv
+    event_time: snapshot_date
+    keys: [Customer_ID, snapshot_date]
+    role: feature_source
+  features_financials:
+    file: features_financials.csv
+    event_time: snapshot_date
+    keys: [Customer_ID, snapshot_date]
+    role: feature_source
+
+# ---- Which data may be used as predictors ------------------------------------------------
+feature_availability:
+  join_rule: >
+    As-of join on Customer_ID: take the latest snapshot with
+    snapshot_date <= loan_start_date. Nothing dated after the scoring timestamp is allowed.
+  tables:
+    features_attributes:
+      allowed: true
+      join_key: Customer_ID
+      as_of: snapshot_date <= loan_start_date
+    features_financials:
+      allowed: true
+      join_key: Customer_ID
+      as_of: snapshot_date <= loan_start_date
+    feature_clickstream:
+      allowed: true
+      join_key: Customer_ID
+      as_of: snapshot_date <= loan_start_date
+      note: covers only part of the loan customers (see raw EDA issue BRZ-001); missing = no clickstream history
+    lms_loan_daily:
+      allowed: false
+      reason: repayment ledger; contains the outcome (overdue_amt, paid_amt, balance) after the scoring timestamp
+
+excluded_columns:
+  pii:                          # never used as features, never written to reports
+    features_attributes: [Name, SSN]
+  identifiers:                  # keys and timestamps, not predictors
+    - loan_id
+    - Customer_ID
+    - snapshot_date
+    - loan_start_date
+  replaced_by_derived:          # raw text kept in Silver for audit; the parsed versions below are the predictors
+    features_financials: [Type_of_Loan, Credit_History_Age]
+
+# ---- Derived predictors (fixed row-level rules on allowed source columns; no fitting) -----
+# Built in Silver (step 07/09) or Gold (step 10). Same as-of rule as their source table.
+derived_features:
+  features_financials:
+    credit_history_age_months: {from: [Credit_History_Age], rule: "years * 12 + months"}
+    num_loan_types:            {from: [Type_of_Loan], rule: "number of entries in the loan list (0 = no loans)"}
+    type_of_loan_unknown:      {from: [Type_of_Loan], rule: "any entry not one of the 9 known loan types"}
+    has_auto_loan:               {from: [Type_of_Loan], rule: "'Auto Loan' in loan list"}
+    has_credit_builder_loan:     {from: [Type_of_Loan], rule: "'Credit-Builder Loan' in loan list"}
+    has_debt_consolidation_loan: {from: [Type_of_Loan], rule: "'Debt Consolidation Loan' in loan list"}
+    has_home_equity_loan:        {from: [Type_of_Loan], rule: "'Home Equity Loan' in loan list"}
+    has_mortgage_loan:           {from: [Type_of_Loan], rule: "'Mortgage Loan' in loan list"}
+    has_not_specified_loan:      {from: [Type_of_Loan], rule: "'Not Specified' in loan list"}
+    has_payday_loan:             {from: [Type_of_Loan], rule: "'Payday Loan' in loan list"}
+    has_personal_loan:           {from: [Type_of_Loan], rule: "'Personal Loan' in loan list"}
+    has_student_loan:            {from: [Type_of_Loan], rule: "'Student Loan' in loan list"}
+    Annual_Income_invalid:           {from: [Annual_Income], rule: "source value invalid / out of range (set to null in Silver)"}
+    Num_Bank_Accounts_invalid:       {from: [Num_Bank_Accounts], rule: "source value invalid / out of range"}
+    Num_Credit_Card_invalid:         {from: [Num_Credit_Card], rule: "source value invalid / out of range"}
+    Interest_Rate_invalid:           {from: [Interest_Rate], rule: "source value invalid / out of range"}
+    Num_of_Loan_invalid:             {from: [Num_of_Loan], rule: "source value invalid / out of range"}
+    Num_of_Delayed_Payment_invalid:  {from: [Num_of_Delayed_Payment], rule: "source value invalid / out of range"}
+    Changed_Credit_Limit_invalid:    {from: [Changed_Credit_Limit], rule: "source value invalid token"}
+    Num_Credit_Inquiries_invalid:    {from: [Num_Credit_Inquiries], rule: "source value invalid / out of range"}
+    Credit_Mix_invalid:              {from: [Credit_Mix], rule: "placeholder category"}
+    Payment_of_Min_Amount_invalid:   {from: [Payment_of_Min_Amount], rule: "placeholder / NM code"}
+    Total_EMI_per_month_invalid:     {from: [Total_EMI_per_month, Monthly_Inhand_Salary], rule: "out of range or > monthly salary"}
+    Amount_invested_monthly_invalid: {from: [Amount_invested_monthly], rule: "source value invalid token"}
+    Payment_Behaviour_invalid:       {from: [Payment_Behaviour], rule: "placeholder category"}
+    Monthly_Balance_invalid:         {from: [Monthly_Balance], rule: "source value invalid token"}
+  features_attributes:
+    Age_invalid:        {from: [Age], rule: "source value invalid / out of range"}
+    Occupation_invalid: {from: [Occupation], rule: "placeholder category"}

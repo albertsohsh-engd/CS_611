@@ -1,0 +1,27 @@
+# Core
+pyspark==3.5.3
+pandas==2.2.3
+numpy==1.26.4
+pyarrow==17.0.0
+pyyaml==6.0.3
+
+# Testing / validation
+pytest==8.3.3
+pandera==0.20.4
+
+# EDA / profiling
+matplotlib==3.10.0
+ydata-profiling==4.18.4
+setuptools==80.10.2   # ydata-profiling still imports pkg_resources (removed in setuptools 81)
+
+# Modelling
+scikit-learn==1.9.1
+lightgbm==3.3.5       # OpenFE 0.0.12 crashes with LightGBM 4.x (access violation in stage 2)
+openfe==0.0.12        # step 21 AutoFE (row-wise operators only; see notebooks/ml_feature_engineering.ipynb)
+xgboost==3.2.0        # step 25 candidate model
+optuna==5.0.0         # step 29 hyperparameter tuning
+mlflow==3.17.1        # step 33 model registry (local SQLite store under datamart/ml/mlflow)
+
+# Notebooks
+jupyterlab==4.2.5
+ipykernel==6.29.5

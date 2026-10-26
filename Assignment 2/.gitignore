@@ -31,4 +31,7 @@ Thumbs.db
 *.temp
 
 # Large data files / model artifacts (too big for GitHub, kept local only)
-Data/
+data/
+datamart/
+# Personal Claude Code instructions (not part of the submission)
+CLAUDE.local.md

@@ -1,0 +1,95 @@
+# =====================================================================================
+# Silver schema contract — Step 05
+# Target type, requirement and criticality of every Bronze column in Silver.
+#   type      : string | int | double | date
+#   required  : column must exist in Bronze (schema drift policy below)
+#   critical  : a null or un-castable value quarantines the whole row (keys, dates, label inputs)
+#   pii       : personal identifier — not loaded into Silver
+# Read by: notebooks/dataprocessing_silver.ipynb (and util/dataprocessing_silver.py)
+# =====================================================================================
+version: 1
+
+drift_policy:
+  missing_required_column: fail    # stop the Silver build
+  missing_optional_column: warn    # add the column as null, report it
+  unexpected_column: warn          # drop it from Silver, report it
+
+lineage_columns: [_source_file, _source_row_num, _batch_id]   # carried from Bronze
+
+tables:
+  lms_loan_daily:
+    keys: [loan_id, snapshot_date]
+    columns:
+      loan_id:         {type: string, required: true, critical: true}
+      Customer_ID:     {type: string, required: true, critical: true}
+      loan_start_date: {type: date,   required: true, critical: true}
+      tenure:          {type: int,    required: true, critical: true}
+      installment_num: {type: int,    required: true, critical: true}
+      loan_amt:        {type: double, required: true, critical: true}
+      due_amt:         {type: double, required: true, critical: true}
+      paid_amt:        {type: double, required: true, critical: true}
+      overdue_amt:     {type: double, required: true, critical: true}
+      balance:         {type: double, required: true, critical: true}
+      snapshot_date:   {type: date,   required: true, critical: true}
+
+  feature_clickstream:
+    keys: [Customer_ID, snapshot_date]
+    columns:
+      fe_1:  {type: int, required: true}
+      fe_2:  {type: int, required: true}
+      fe_3:  {type: int, required: true}
+      fe_4:  {type: int, required: true}
+      fe_5:  {type: int, required: true}
+      fe_6:  {type: int, required: true}
+      fe_7:  {type: int, required: true}
+      fe_8:  {type: int, required: true}
+      fe_9:  {type: int, required: true}
+      fe_10: {type: int, required: true}
+      fe_11: {type: int, required: true}
+      fe_12: {type: int, required: true}
+      fe_13: {type: int, required: true}
+      fe_14: {type: int, required: true}
+      fe_15: {type: int, required: true}
+      fe_16: {type: int, required: true}
+      fe_17: {type: int, required: true}
+      fe_18: {type: int, required: true}
+      fe_19: {type: int, required: true}
+      fe_20: {type: int, required: true}
+      Customer_ID:   {type: string, required: true, critical: true}
+      snapshot_date: {type: date,   required: true, critical: true}
+
+  features_attributes:
+    keys: [Customer_ID, snapshot_date]
+    columns:
+      Customer_ID:   {type: string, required: true, critical: true}
+      Name:          {type: string, required: false, pii: true}
+      Age:           {type: int,    required: true}
+      SSN:           {type: string, required: false, pii: true}
+      Occupation:    {type: string, required: true}
+      snapshot_date: {type: date,   required: true, critical: true}
+
+  features_financials:
+    keys: [Customer_ID, snapshot_date]
+    columns:
+      Customer_ID:              {type: string, required: true, critical: true}
+      Annual_Income:            {type: double, required: true}
+      Monthly_Inhand_Salary:    {type: double, required: true}
+      Num_Bank_Accounts:        {type: int,    required: true}
+      Num_Credit_Card:          {type: int,    required: true}
+      Interest_Rate:            {type: int,    required: true}
+      Num_of_Loan:              {type: int,    required: true}
+      Type_of_Loan:             {type: string, required: true}
+      Delay_from_due_date:      {type: int,    required: true}
+      Num_of_Delayed_Payment:   {type: int,    required: true}
+      Changed_Credit_Limit:     {type: double, required: true}
+      Num_Credit_Inquiries:     {type: int,    required: true}
+      Credit_Mix:               {type: string, required: true}
+      Outstanding_Debt:         {type: double, required: true}
+      Credit_Utilization_Ratio: {type: double, required: true}
+      Credit_History_Age:       {type: string, required: true}
+      Payment_of_Min_Amount:    {type: string, required: true}
+      Total_EMI_per_month:      {type: double, required: true}
+      Amount_invested_monthly:  {type: double, required: true}
+      Payment_Behaviour:        {type: string, required: true}
+      Monthly_Balance:          {type: double, required: true}
+      snapshot_date:            {type: date,   required: true, critical: true}

@@ -1,0 +1,53 @@
+# JupyterLab (notebooks, development) + Airflow (the three DAGs in dags/). The project folder is mounted at /app.
+#   docker compose up -d --build        -> JupyterLab http://localhost:8888, Airflow http://localhost:8080 (admin / admin)
+x-airflow: &airflow
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: SequentialExecutor          # one task at a time, SQLite metadata DB (as in lab 5)
+    AIRFLOW__CORE__FERNET_KEY: c0PrsOQjCTS2-r90-KMXLrBqu1WyKPw5Y0-s32da0V0=
+    AIRFLOW__WEBSERVER__SECRET_KEY: ynM_GJl1qfSMIySgWlw9vBXNuTo6O-Yq
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"   # unpause the three DAGs in the UI to start the back-fill
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: "30"
+  volumes:
+    - airflow_home:/opt/airflow                          # Airflow metadata DB and logs
+    - ./dags:/opt/airflow/dags
+    - .:/app                                             # project: data/, config/, util/, datamart/
+
+services:
+  jupyter:
+    build: .
+    container_name: cs611_a2
+    ports:
+      - "8888:8888"   # JupyterLab
+      - "4040:4040"   # Spark UI
+    volumes:
+      - .:/app        # project folder mounted live
+
+  airflow-init:
+    <<: *airflow
+    entrypoint: >
+      /bin/bash -c "airflow db migrate &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin
+      --email admin@example.com || true"
+
+  airflow-webserver:
+    <<: *airflow
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    command: webserver
+
+  airflow-scheduler:
+    <<: *airflow
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+
+volumes:
+  airflow_home:
